@@ -1,0 +1,46 @@
+{
+  "name": "mcp-codexreview",
+  "version": "0.1.0",
+  "description": "MCP server that runs OpenAI Codex CLI to review git changes",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "mcp-codexreview": "build/index.js"
+  },
+  "files": [
+    "build/"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "start": "node build/index.js",
+    "dev": "tsc-watch --onSuccess \"node build/index.js\"",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "codex",
+    "code-review",
+    "mcp",
+    "openai"
+  ],
+  "author": "Tasuku Suzuki",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/signal-slot/mcp-codexreview.git"
+  },
+  "types": "./build/index.d.ts",
+  "bugs": {
+    "url": "https://github.com/signal-slot/mcp-codexreview/issues"
+  },
+  "homepage": "https://github.com/signal-slot/mcp-codexreview#readme"
+}
