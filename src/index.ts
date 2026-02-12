@@ -91,9 +91,14 @@ async function hasParentCommit(cwd: string): Promise<boolean> {
   }
 }
 
-async function emptyTreeSha(cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync('git', ['hash-object', '-t', 'tree', '/dev/null'], { cwd });
-  return stdout.trim();
+function emptyTreeSha(cwd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const proc = execFile('git', ['hash-object', '-t', 'tree', '--stdin'], { cwd }, (err, stdout) => {
+      if (err) return reject(err);
+      resolve(stdout.trim());
+    });
+    proc.stdin!.end();
+  });
 }
 
 async function gitDiffArgs(type: DiffType, nameStatusOnly: boolean, useRootDiff: boolean, cwd: string, filePath?: string): Promise<string[]> {
