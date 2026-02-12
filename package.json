@@ -1,6 +1,6 @@
 {
   "name": "mcp-codexreview",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server that runs OpenAI Codex CLI to review git changes",
   "type": "module",
   "main": "build/index.js",
