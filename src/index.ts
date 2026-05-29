@@ -7,7 +7,7 @@ import {
   ListToolsRequestSchema,
   McpError
 } from '@modelcontextprotocol/sdk/types.js';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import * as os from 'os';
 import * as path from 'path';
@@ -128,6 +128,55 @@ function diffTypeLabel(type: DiffType): string {
     case 'staged': return 'staged';
     case 'last_commit': return 'last commit';
   }
+}
+
+/**
+ * Run `codex` with stdin closed. The MCP host hands us an inherited pipe stdin
+ * that never receives data, which makes `codex exec` block on its "read
+ * additional input from stdin" path and exit without writing the
+ * `--output-last-message` file. `execFile`'s `options.stdio` is ignored, so we
+ * use `spawn` directly and set stdin to `ignore`.
+ */
+function runCodexExec(args: string[], timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('codex', args, {
+      stdio: ['ignore', 'ignore', 'pipe'],
+      env: process.env,
+    });
+
+    let stderr = '';
+    const STDERR_CAP = 65536;
+    let killedByTimeout = false;
+
+    const timer = setTimeout(() => {
+      killedByTimeout = true;
+      child.kill('SIGTERM');
+    }, timeoutMs);
+
+    child.stderr!.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+      if (stderr.length > STDERR_CAP) {
+        stderr = stderr.slice(-STDERR_CAP);
+      }
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    child.on('close', (code, signal) => {
+      clearTimeout(timer);
+      const tail = stderr.slice(-1000).trim();
+      if (killedByTimeout) {
+        reject(new Error(`codex exec timed out after ${timeoutMs}ms${tail ? `. stderr tail: ${tail}` : ''}`));
+      } else if (code !== 0) {
+        reject(new Error(`codex exec failed (exit ${code}${signal ? `, signal ${signal}` : ''})${tail ? `: ${tail}` : ''}`));
+      } else {
+        resolve();
+      }
+    });
+  });
 }
 
 async function diffGitCommand(type: DiffType, cwd: string, useRootDiff = false): Promise<string> {
@@ -472,11 +521,7 @@ class CodexReviewServer {
         args.push('--skip-git-repo-check');
       }
 
-      await execFileAsync('codex', args, {
-        timeout: 300000,  // 5 minutes
-        maxBuffer: 50 * 1024 * 1024,
-        env: { ...process.env },
-      });
+      await runCodexExec(args, 300000);
 
       return await fs.readFile(tmpFile, 'utf-8');
     } finally {
